@@ -2,7 +2,7 @@ top_n: 25
 
 candidate:
   target_roles:
-    - Forward Development Engineer
+    - Forward Deployed Engineer
     - Solutions Engineer
     - Tech Consultant
     - Applied AI Engineer
@@ -14,7 +14,7 @@ candidate:
     - sql
     - cloud
     - data pipelines
-    - AI
+    - AI agents
 
   dealbreakers:
     - phd required
@@ -39,5 +39,5 @@ scoring:
     must_have: 0.10
     location: 0.05
 
-  penalites:
+  penalties:
     dealbreaker: 0.30
