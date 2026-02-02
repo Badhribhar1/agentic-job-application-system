@@ -1,0 +1,43 @@
+top_n: 25
+
+candidate:
+  target_roles:
+    - Forward Development Engineer
+    - Solutions Engineer
+    - Tech Consultant
+    - Applied AI Engineer
+    - Data Engineer
+    - Analytics Engineer
+  
+  must_haves:
+    - python
+    - sql
+    - cloud
+    - data pipelines
+    - AI
+
+  dealbreakers:
+    - phd required
+    - publish papers
+    - research-only
+    - c++ only
+
+preferences:
+  preferred_locations:
+    - Chicago
+    - Boston
+    - San Francisco
+    - Seattle
+    - New York
+    - Tampa Bay
+    - Atlanta
+
+scoring:
+  weights:
+    semantic: 0.75
+    title_match: 0.10
+    must_have: 0.10
+    location: 0.05
+
+  penalites:
+    dealbreaker: 0.30

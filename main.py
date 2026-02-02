@@ -1,6 +1,6 @@
 import argparse
 
-from pipelines.ingestion import run_ingestion
+from pipelines.ingestion import ingestion
 from pipelines.ranking import run_ranking
 
 
@@ -12,12 +12,12 @@ def main():
     args = parser.parse_args()
 
     if args.run:
-        run_ingestion()
+        ingestion()
         run_ranking()
         return
 
     if args.ingest:
-        run_ingestion()
+        ingestion()
     if args.rank:
         run_ranking()
 

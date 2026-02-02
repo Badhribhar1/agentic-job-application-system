@@ -213,6 +213,13 @@ data/
 *.json
 *.xlsx
 
+data/processed/
+data/raw/resume.txt
+__pycache__/
+*.pyc
+.venv/
+
+
 # Credentials / secrets
 secrets/
 credentials/

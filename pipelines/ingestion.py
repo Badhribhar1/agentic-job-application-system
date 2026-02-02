@@ -4,7 +4,7 @@ from typing import List, Dict, Any
 from models.job import JobPosting
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-RAW_JOBS_PATH = PROJECT_ROOT / "data" / "raw" / "jobs_sample.json"
+RAW_JOBS_PATH = PROJECT_ROOT / "data" / "raw" / "job_sample.json"
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
 NORMALIZED_JOBS_PATH = PROCESSED_DIR / "jobs_normalized.json"
 
@@ -14,7 +14,7 @@ def load_raw_jobs(path: Path = RAW_JOBS_PATH) -> List[Dict[str, Any]]:
     with path.open("r", encoding ="utf-8") as f:
         data = json.load(f)
     if not isinstance(data, list):
-        raise ValueError("jobs_sample.json must contain a JSON list of job objects")
+        raise ValueError("job_sample.json must contain a JSON list of job objects")
     return data
 
 def normalize_job(raw: Dict[str, Any]) -> JobPosting:
@@ -69,7 +69,7 @@ def save_normalized_jobs(jobs: List[JobPosting], path: Path = NORMALIZED_JOBS_PA
     print(f"[ingestion] Saved {len(jobs)} normalized jobs -> {path}")
 
 
-def injestion() -> List[JobPosting]:
+def ingestion() -> List[JobPosting]:
     raw = load_raw_jobs()
     jobs = normalize_jobs(raw)
     save_normalized_jobs(jobs)

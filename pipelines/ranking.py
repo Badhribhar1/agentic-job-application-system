@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from config.loader import load_settings
 from typing import List, Tuple
 import pandas as pd
 
@@ -35,25 +36,23 @@ def load_normalized_jobs(path: Path = NORMALIZED_JOBS_PATH) -> List[JobPosting]:
     return [JobPosting(**row) for row in data]
 
 
-def default_candidate_profile(resume_text: str) -> CandidateProfile:
-    """
-    Day 1: hardcode your preferences here.
-    Later you’ll load this from config or parse resume sections.
-    """
-    return CandidateProfile(
-        resume_text=resume_text,
-        target_roles=[
-            "Data Engineer",
-            "Applied AI Engineer",
-            "Forward Deployed Engineer",
-            "Solutions Engineer",
-            "Technical Consultant",
-            "Analytics Engineer",
-        ],
-        must_haves=["python", "sql", "cloud", "pipelines", "data"],
-        dealbreakers=["phd required", "publish papers", "research-only", "c++ only"],
-        preferred_locations=["remote", "chicago", "boston", "new york"],
-    )
+# USE FOR TESTING PURPOSES
+# def default_candidate_profile(resume_text: str) -> CandidateProfile:
+#  
+#     return CandidateProfile(
+#         resume_text=resume_text,
+#         target_roles=[
+#             "Data Engineer",
+#             "Applied AI Engineer",
+#             "Forward Deployed Engineer",
+#             "Solutions Engineer",
+#             "Technical Consultant",
+#             "Analytics Engineer",
+#         ],
+#         must_haves=["python", "sql", "cloud", "pipelines", "data"],
+#         dealbreakers=["phd required", "publish papers", "research-only", "c++ only"],
+#         preferred_locations=["remote", "chicago", "boston", "new york"],
+#     )
 
 
 def tfidf_similarity(query: str, docs: List[str]) -> List[float]:
@@ -66,64 +65,59 @@ def tfidf_similarity(query: str, docs: List[str]) -> List[float]:
     return sims.tolist()
 
 
-def score_job(profile: CandidateProfile, job: JobPosting, base_sim: float) -> Tuple[float, List[str]]:
-    """
-    base_sim is already 0..1. Add simple boosts/penalties.
-    """
+def score_job(profile: CandidateProfile, job: JobPosting, base_sim: float, weights: dict, penalties: dict) -> Tuple[float, List[str]]:
+    
     reasons: List[str] = []
-    score = base_sim
+
+    # Weighted base similarity
+    semantic_w = float(weights.get("semantic", 1.0))
+    score = base_sim * semantic_w
 
     title_lower = job.title.lower()
     desc_lower = job.description.lower()
 
-    # Boost if target role matches title
+    # Title match boost
+    title_boost = float(weights.get("title_match", 0.0))
     for role in profile.target_roles:
         if role.lower() in title_lower:
-            score += 0.08
+            score += title_boost
             reasons.append(f"title matches target role: {role}")
             break
 
-    # Boost for must-have keywords in description (lightweight)
+    # Must-have boost (scaled by hits)
+    must_have_w = float(weights.get("must_have", 0.0))
     hits = 0
+    matched = []
     for kw in profile.must_haves:
         if kw.lower() in desc_lower:
             hits += 1
-    if hits:
-        bump = min(0.10, hits * 0.02)
-        score += bump
-        reasons.append(f"must-have keywords hit: {hits}")
+            matched.append(kw)
 
-    # Penalize dealbreakers if present
+    if hits:
+        # Normalize: 1.0 means you hit all must-haves (cap at 1.0)
+        frac = min(1.0, hits / max(1, len(profile.must_haves)))
+        score += must_have_w * frac
+        reasons.append(f"must-have keywords hit: {hits} ({', '.join(matched[:4])})")
+
+    # Dealbreaker penalty
+    dealbreaker_pen = float(penalties.get("dealbreaker", 0.0))
     for bad in profile.dealbreakers:
         if bad.lower() in desc_lower:
-            score -= 0.25
+            score -= dealbreaker_pen
             reasons.append(f"dealbreaker detected: {bad}")
             break
 
-    # Clamp to [0, 1]
+    # Optional: location/remote preference boost
+    loc_w = float(weights.get("location", 0.0))
+    if loc_w and profile.preferred_locations:
+        loc_text = f"{job.location} {'remote' if job.remote else ''}".lower()
+        if any(loc.lower() in loc_text for loc in profile.preferred_locations):
+            score += loc_w
+            reasons.append("matches location/remote preference")
+
+    # Clamp
     score = max(0.0, min(1.0, score))
     return score, reasons
-
-
-def rank_jobs(profile: CandidateProfile, jobs: List[JobPosting]) -> List[RankedJob]:
-    docs = [j.description for j in jobs]
-    sims = tfidf_similarity(profile.resume_text, docs)
-
-    ranked: List[RankedJob] = []
-    for job, sim in zip(jobs, sims):
-        score, reasons = score_job(profile, job, sim)
-        ranked.append(
-            RankedJob(
-                job_id=job.job_id,
-                title=job.title,
-                company=job.company,
-                score=round(score, 4),
-                reasons=reasons,
-            )
-        )
-
-    ranked.sort(key=lambda r: r.score, reverse=True)
-    return ranked
 
 
 def save_ranked_outputs(ranked: List[RankedJob]) -> None:
@@ -145,11 +139,56 @@ def save_ranked_outputs(ranked: List[RankedJob]) -> None:
         print(f"  - {r.score:.3f} | {r.title} @ {r.company}")
 
 
+
+def rank_jobs(
+    profile: CandidateProfile,
+    jobs: List[JobPosting],
+    weights: dict,
+    penalties: dict
+) -> List[RankedJob]:
+    docs = [j.description for j in jobs]
+    sims = tfidf_similarity(profile.resume_text, docs)
+
+    ranked: List[RankedJob] = []
+    for job, sim in zip(jobs, sims):
+        score, reasons = score_job(profile, job, sim, weights, penalties)
+        ranked.append(
+            RankedJob(
+                job_id=job.job_id,
+                title=job.title,
+                company=job.company,
+                score=round(score, 4),
+                reasons=reasons,
+            )
+        )
+
+    ranked.sort(key=lambda r: r.score, reverse=True)
+    return ranked
+
+
+def build_candidate_profile_from_settings(resume_text: str, settings: dict) -> CandidateProfile:
+    return CandidateProfile(
+        resume_text=resume_text,
+        target_roles=settings["candidate"]["target_roles"],
+        must_haves=settings["candidate"].get("must_haves", []),
+        dealbreakers=settings["candidate"].get("dealbreakers", []),
+        preferred_locations=settings.get("preferences", {}).get("preferred_locations", []),
+    )
+
+
+
 def run_ranking() -> List[RankedJob]:
+    settings = load_settings()
+
+    weights = settings.get("scoring", {}).get("weights", {})
+    penalties = settings.get("scoring", {}).get("penalties", {})    
+
     resume_text = load_resume_text()
-    profile = default_candidate_profile(resume_text)
+    profile = build_candidate_profile_from_settings(resume_text, settings)
+
     jobs = load_normalized_jobs()
 
-    ranked = rank_jobs(profile, jobs)
+    ranked = rank_jobs(profile, jobs, weights, penalties)
     save_ranked_outputs(ranked)
     return ranked
+

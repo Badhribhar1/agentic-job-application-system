@@ -5,5 +5,5 @@ class CandidateProfile(BaseModel):
     resume_text: str
     target_roles: List[str]
     must_haves: List[str] = []
-    dealbreakers = List[str] = []
+    dealbreakers: List[str] = []
     preferred_locations: List[str] = []
